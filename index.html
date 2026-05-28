@@ -1423,6 +1423,93 @@
     .sprite-frame.blend-additive { mix-blend-mode: screen; }
   }
 
+  /* ============ CROP OVERLAY ============
+     Lives inside .canvas-wrap. JS positions .crop-rect in % matching the
+     cropX/Y/W/H state (in source pixel coords, normalized to source W/H). */
+  .crop-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;       /* handles + rect re-enable */
+    z-index: 5;
+  }
+  /* When the crop overlay does NOT have .show-handles, all visual aids are
+     hidden (drag rect border, guide lines, handles, size readout). The crop
+     itself still applies — this is purely a UI affordance toggle. The mask
+     (canvas clip-path) is unaffected. */
+  .crop-overlay:not(.show-handles) .crop-rect {
+    border-color: transparent;
+    box-shadow: none;
+    cursor: default;
+    pointer-events: none;
+  }
+  .crop-overlay:not(.show-handles) .crop-handle,
+  .crop-overlay:not(.show-handles) .crop-rule,
+  .crop-overlay:not(.show-handles) .crop-size-readout {
+    display: none;
+  }
+  /* Dimming bands outside the crop rect — purely visual */
+  .crop-dim {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+  }
+  .crop-rect {
+    position: absolute;
+    border: 1.5px solid var(--accent);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.4),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+    box-sizing: border-box;
+    cursor: move;
+    pointer-events: auto;
+  }
+  /* Rule-of-thirds guide lines */
+  .crop-rule {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.25);
+    pointer-events: none;
+  }
+  .crop-rule-v1 { left: 33.33%; top: 0; bottom: 0; width: 1px; }
+  .crop-rule-v2 { left: 66.66%; top: 0; bottom: 0; width: 1px; }
+  .crop-rule-h1 { top: 33.33%; left: 0; right: 0; height: 1px; }
+  .crop-rule-h2 { top: 66.66%; left: 0; right: 0; height: 1px; }
+
+  /* Drag handles — 8 around the rect */
+  .crop-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: var(--accent);
+    border: 1.5px solid var(--bg);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+    z-index: 2;
+  }
+  .crop-handle-nw { left: 0; top: 0; transform: translate(-50%, -50%); cursor: nwse-resize; }
+  .crop-handle-n  { left: 50%; top: 0; transform: translate(-50%, -50%); cursor: ns-resize; }
+  .crop-handle-ne { right: 0; top: 0; transform: translate(50%, -50%); cursor: nesw-resize; }
+  .crop-handle-w  { left: 0; top: 50%; transform: translate(-50%, -50%); cursor: ew-resize; }
+  .crop-handle-e  { right: 0; top: 50%; transform: translate(50%, -50%); cursor: ew-resize; }
+  .crop-handle-sw { left: 0; bottom: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
+  .crop-handle-s  { left: 50%; bottom: 0; transform: translate(-50%, 50%); cursor: ns-resize; }
+  .crop-handle-se { right: 0; bottom: 0; transform: translate(50%, 50%); cursor: nwse-resize; }
+
+  .crop-size-readout {
+    position: absolute;
+    bottom: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent);
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--line-2);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
   .canvas-wrap {
     position: absolute;
     inset: 0;
@@ -1511,16 +1598,41 @@
   .lp-vp-tools {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     margin-left: 12px;
     padding-left: 12px;
     border-left: 1px solid var(--line);
   }
-  .lp-vp-tools .player-btn.tiny {
-    font-size: 13px;
-    width: 28px;
+  /* Viewport tool buttons — match project style: panel-2 bg, thin border,
+     teal-on-hover. Labeled variant (FIT) is auto-width with icon+text;
+     icon variant (fullscreen) is a fixed square. */
+  .vp-tool-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     height: 28px;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    color: var(--ink-dim);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    border-radius: var(--r-sm);
+    transition: all 120ms;
+    white-space: nowrap;
   }
+  .vp-tool-btn svg { flex-shrink: 0; display: block; }
+  .vp-tool-labeled { padding: 0 11px; }
+  .vp-tool-icon { width: 28px; padding: 0; }
+  .vp-tool-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(94, 234, 212, 0.06);
+  }
+  .vp-tool-btn:active { transform: translateY(0.5px); }
   .vp-zoom-readout {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -1564,6 +1676,36 @@
     bottom: 16px;
     right: 16px;
     z-index: 5;
+  }
+  /* When the user has dragged the bar, JS sets left/top explicitly and the
+     .dragged class clears the default bottom/right anchors. */
+  .lp-backdrop-bar.dragged {
+    bottom: auto;
+    right: auto;
+  }
+  /* Drag handle — a small dot-grid icon on the left edge. Cursor signals
+     grab/grabbing. Only active in the floating (preview-side) bar; atlas
+     side doesn't get a handle. */
+  .bd-drag-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 100%;
+    margin-right: 2px;
+    color: var(--ink-low);
+    cursor: grab;
+    user-select: none;
+    flex-shrink: 0;
+    transition: color 120ms;
+  }
+  .bd-drag-handle:hover { color: var(--ink-dim); }
+  .lp-backdrop-bar.dragging .bd-drag-handle,
+  .bd-drag-handle:active { cursor: grabbing; color: var(--accent); }
+  .lp-backdrop-bar.dragging {
+    /* Subtle visual cue while dragging */
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    opacity: 0.95;
   }
   .lp-backdrop-bar select {
     background: var(--panel-2);
@@ -1639,6 +1781,51 @@
   .btn-ghost {
     background: transparent !important;
     color: var(--ink-dim) !important;
+  }
+  /* Crop group (left panel) */
+  #cropGroup .field-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  #cropGroup .field-row .btn {
+    flex: 1;
+    margin-top: 0;
+  }
+  /* On-state for the btn-mini toggle in the crop group */
+  #cropHandlesBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+  #cropHandlesBtn .crop-btn-icon {
+    flex-shrink: 0;
+    opacity: 0.75;
+    transition: opacity 120ms;
+  }
+  #cropHandlesBtn.on {
+    background: var(--accent) !important;
+    color: var(--bg) !important;
+    border-color: var(--accent) !important;
+  }
+  #cropHandlesBtn.on .crop-btn-icon { opacity: 1; }
+  /* Status readout — shows crop state in a small framed box */
+  .crop-status {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    padding: 6px 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-xs);
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+  }
+  .crop-status.active {
+    color: var(--accent);
+    border-color: rgba(94, 234, 212, 0.3);
+    background: rgba(94, 234, 212, 0.06);
   }
 
   /* Loop Editor (now inside Slicing body, not floating) */
@@ -2447,10 +2634,8 @@
         </div>
         <input type="file" id="fileInput" accept="video/*,image/gif,.gif,.mp4,.webm,.mov,.m4v,.mkv,.ogv" style="display:none">
       </div>
-      <div class="info-row" id="rangeInfo" style="display:none">
-        <div><div class="lbl" data-i18n="src.in">In</div><div class="v" id="inTime">0.00s</div></div>
-        <div><div class="lbl" data-i18n="src.out">Out</div><div class="v" id="outTime">0.00s</div></div>
-      </div>
+      <!-- In/Out info row was removed — the Global Timeline at the bottom of
+           Live Preview is now the single source of truth for IN/OUT. -->
     </div>
 
     <!-- Range group moved to bottom of Live Preview area. Compat shims for
@@ -2458,8 +2643,33 @@
          $('pinOut'), $('rangeGroup')) are kept as hidden no-op elements via
          the global #compat-shims container at end of <body>. -->
 
+    <!-- ============ 02 · CROP ============
+         Crop is an output-time operation — Processing pipeline always runs
+         on full source. The frame defaults to full-source (visually = no
+         crop). Drag handles in the preview to shrink, RESET to return.
+         The "把手" toggle hides handles/guides without affecting the crop. -->
+    <div class="group" id="cropGroup" style="display:none">
+      <h3 data-i18n="crop.group">02 · 裁剪</h3>
+      <div class="field-row">
+        <button class="btn btn-mini" id="cropHandlesBtn" data-i18n-tip="crop.handlesTip" data-tip="顯示 / 隱藏裁剪把手與輔助線 · 裁剪結果不受此切換影響">
+          <svg class="crop-btn-icon" viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+            <!-- Two L-shaped crop marks at opposing corners -->
+            <path d="M 5 1 L 5 5 L 1 5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="square"/>
+            <path d="M 11 15 L 11 11 L 15 11" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="square"/>
+            <!-- Dashed rect hinting the crop area -->
+            <rect x="4.5" y="4.5" width="7" height="7" stroke="currentColor" stroke-width="0.75" fill="none" stroke-dasharray="1.2 1" opacity="0.55"/>
+          </svg>
+          <span data-i18n="crop.handles">顯示裁剪</span>
+        </button>
+        <button class="btn btn-mini btn-ghost" id="cropResetBtn" data-i18n-tip="crop.resetTip" data-tip="重設為完整來源" data-i18n="crop.reset">RESET</button>
+      </div>
+      <div class="crop-status" id="cropInfo">
+        <span data-i18n="crop.full">完整來源</span>
+      </div>
+    </div>
+
     <div class="group" id="keyGroup" style="display:none">
-      <h3 data-i18n="key.group">02 · Keying</h3>
+      <h3 data-i18n="key.group">03 · Keying</h3>
       <div class="field">
         <div class="seg" id="modeSeg">
           <button data-mode="chroma" class="on" data-i18n="key.modeChroma">CHROMA</button>
@@ -2582,8 +2792,26 @@
               </span>
             </div>
             <div class="lp-vp-tools">
-              <button class="player-btn tiny" id="vpFitBtn2" data-i18n-tip="aspect.fitTip" data-tip="Fit to viewport (or double-click)" data-i18n="aspect.fit">⊡ FIT</button>
-              <button class="player-btn tiny" id="vpFsBtn" data-i18n-tip="aspect.fs" data-tip="Fullscreen (F11)">⛶</button>
+              <button class="vp-tool-btn vp-tool-labeled" id="vpFitBtn2" data-i18n-tip="aspect.fitTip" data-tip="Fit to viewport (or double-click)">
+                <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                  <!-- Fit-to-frame: corner brackets pointing inward -->
+                  <path d="M2 5 V2 H5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M11 2 H14 V5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M14 11 V14 H11" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M5 14 H2 V11" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  <rect x="6" y="6" width="4" height="4" rx="0.5" fill="currentColor" opacity="0.5"/>
+                </svg>
+                <span data-i18n="aspect.fit">對齊</span>
+              </button>
+              <button class="vp-tool-btn vp-tool-icon" id="vpFsBtn" data-i18n-tip="aspect.fs" data-tip="Fullscreen (F11)">
+                <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                  <!-- Fullscreen: corner brackets pointing outward -->
+                  <path d="M6 2 H2 V6" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M14 6 V2 H10" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M10 14 H14 V10" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M2 10 V14 H6" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -2604,18 +2832,60 @@
                     <div class="lp-frame-overlay" id="lpFrameOverlay" style="display:none">
                       <span id="lpFrameLabel">0 / 0</span>
                     </div>
+                    <!-- Crop frame overlay — always visible when a source is
+                         loaded. Crop is an output-time operation (Processing
+                         is unaffected). The frame defaults to full-source so
+                         visually there's no crop until user drags inward.
+                         Mask visuals: when the crop rect is smaller than the
+                         source, a CSS clip-path on the canvas hides pixels
+                         outside the rect, letting the backdrop show through. -->
+                    <div class="crop-overlay" id="cropOverlay" style="display:none">
+                      <div class="crop-dim crop-dim-top" id="cropDimTop"></div>
+                      <div class="crop-dim crop-dim-bottom" id="cropDimBottom"></div>
+                      <div class="crop-dim crop-dim-left" id="cropDimLeft"></div>
+                      <div class="crop-dim crop-dim-right" id="cropDimRight"></div>
+                      <div class="crop-rect" id="cropRect">
+                        <div class="crop-handle crop-handle-nw" data-edge="nw"></div>
+                        <div class="crop-handle crop-handle-n"  data-edge="n"></div>
+                        <div class="crop-handle crop-handle-ne" data-edge="ne"></div>
+                        <div class="crop-handle crop-handle-w"  data-edge="w"></div>
+                        <div class="crop-handle crop-handle-e"  data-edge="e"></div>
+                        <div class="crop-handle crop-handle-sw" data-edge="sw"></div>
+                        <div class="crop-handle crop-handle-s"  data-edge="s"></div>
+                        <div class="crop-handle crop-handle-se" data-edge="se"></div>
+                        <div class="crop-rule crop-rule-v1"></div>
+                        <div class="crop-rule crop-rule-v2"></div>
+                        <div class="crop-rule crop-rule-h1"></div>
+                        <div class="crop-rule crop-rule-h2"></div>
+                        <div class="crop-size-readout" id="cropSizeReadout">— × —</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Floating backdrop bar (bottom-right of viewport) -->
-          <div class="backdrop-bar lp-backdrop-bar" id="backdropBarPrev">
+          <!-- Floating backdrop bar — draggable within the viewport.
+               The drag-handle on the left captures mousedown and moves the
+               whole bar via absolute left/top. Coordinates are clamped to
+               the viewport's bounding box. Position is NOT persisted across
+               page reloads; the bar resets to bottom-right on each load. -->
+          <div class="backdrop-bar lp-backdrop-bar floating" id="backdropBarPrev">
+            <span class="bd-drag-handle" id="bdDragHandle" data-i18n-tip="bg.dragTip" data-tip="拖曳搬移此面板">
+              <svg viewBox="0 0 8 14" width="8" height="14" aria-hidden="true">
+                <circle cx="2" cy="2" r="1" fill="currentColor"/>
+                <circle cx="6" cy="2" r="1" fill="currentColor"/>
+                <circle cx="2" cy="7" r="1" fill="currentColor"/>
+                <circle cx="6" cy="7" r="1" fill="currentColor"/>
+                <circle cx="2" cy="12" r="1" fill="currentColor"/>
+                <circle cx="6" cy="12" r="1" fill="currentColor"/>
+              </svg>
+            </span>
             <span class="lbl">BG</span>
             <div class="seg-mini" id="bdSegPrev">
-              <button data-bd="solid" class="on">SOLID</button>
-              <button data-bd="checker">CHECKER</button>
+              <button data-bd="solid">SOLID</button>
+              <button data-bd="checker" class="on">CHECKER</button>
               <button data-bd="image">IMAGE</button>
             </div>
             <input type="color" id="bdColorPrev" value="#00ff00" data-tip="Custom color">
@@ -2647,10 +2917,8 @@
 
         <!-- ============ SUB-TAB BODY: PROCESSING (去背 + 色彩) ============ -->
         <div class="lp-subtab-body" id="bodyProcessing">
-          <!-- (Source Time, Pick Color, and IN/OUT jump buttons were moved /
-               removed: scrub/playhead is now in the Global Timeline at the
-               bottom of the preview, and Pick Color lives in the left panel
-               under Keying.) -->
+          <!-- Crop control is now in the left panel as group 02 (between
+               Source and Keying). Processing body holds only color filters. -->
 
           <!-- Color filters (Grayscale + Hue) -->
           <div class="lp-edit-bar">
@@ -2896,8 +3164,8 @@
       <div class="backdrop-bar" id="backdropBarAtlas">
         <span class="lbl">BG</span>
         <div class="seg-mini" id="bdSegAtlas">
-          <button data-bd="solid" class="on">SOLID</button>
-          <button data-bd="checker">CHECKER</button>
+          <button data-bd="solid">SOLID</button>
+          <button data-bd="checker" class="on">CHECKER</button>
         </div>
         <input type="color" id="bdColorAtlas" value="#00ff00" data-tip="Custom color">
         <div class="preset-dots">
@@ -3079,7 +3347,7 @@ const I18N = {
     'gt.label': '取樣範圍 · 拖曳兩端 設定入/出點 · 拖曳中央 跳轉時間',
 
     /* Keying group */
-    'key.group': '02 · 去背',
+    'key.group': '03 · 去背',
     'key.mode': '模式',
     'key.modeChroma': '色彩鍵',
     'key.modeLuma': '亮度鍵',
@@ -3097,7 +3365,7 @@ const I18N = {
     'key.cleanup': 'Alpha 清理',
 
     /* Grid group */
-    'grid.group': '03 · 宮格佈局',
+    'grid.group': '04 · 宮格佈局',
     'grid.preset': '預設',
     'grid.custom': '自訂 欄 × 列',
     'grid.cols': '欄',
@@ -3109,7 +3377,7 @@ const I18N = {
     'grid.totalSize': '總圖尺寸',
 
     /* Output spec */
-    'out.group': '04 · 輸出規格',
+    'out.group': '05 · 輸出規格',
     'out.sizeMode': '尺寸模式',
     'out.fixed': '固定尺寸',
     'out.native': '原始尺寸',
@@ -3120,7 +3388,7 @@ const I18N = {
     'out.trimAlpha': '自動裁切透明邊緣',
 
     /* Export */
-    'exp.group': '05 · 匯出',
+    'exp.group': '06 · 匯出',
     'exp.spriteSheet': '宮格圖 (單張 PNG)',
     'exp.frameSeq': '影格序列 (ZIP)',
     'exp.prefix': '檔名前綴',
@@ -3145,7 +3413,7 @@ const I18N = {
     'aspect.bg': '背景圖',
     'aspect.custom': '自訂',
     'aspect.bgDisabled': '需要先載入背景圖',
-    'aspect.fit': '⊡ 對齊',
+    'aspect.fit': '對齊',
     'aspect.fitTip': '對齊畫布到視窗 (或雙擊)',
     'aspect.fs': '全螢幕 (F11)',
     'aspect.presetHint': '選預設尺寸',
@@ -3174,6 +3442,19 @@ const I18N = {
     'edit.hint': '濾鏡會套用在整個處理管線，包括 Keying、Slicing 與匯出圖集',
     'edit.noFilter': '未啟用',
     'edit.active': '✓ 已啟用 · ',
+
+    /* Crop */
+    'crop.group': '02 · 裁剪',
+    'crop.label': '裁剪',
+    'crop.full': '完整來源',
+    'crop.active': '裁剪中',
+    'crop.handles': '顯示裁剪',
+    'crop.handlesTip': '顯示 / 隱藏裁剪把手與輔助線 · 裁剪結果不受此切換影響',
+    'crop.reset': 'RESET',
+    'crop.resetTip': '重設為完整來源',
+
+    /* Floating BG bar */
+    'bg.dragTip': '拖曳搬移此面板',
 
     /* Keying sub-tab */
     'keying.time': '時間',
@@ -3311,7 +3592,7 @@ const I18N = {
 
     'gt.label': 'Sample Range · drag edges to set IN/OUT · drag center to seek',
 
-    'key.group': '02 · Keying',
+    'key.group': '03 · Keying',
     'key.mode': 'Mode',
     'key.modeChroma': 'CHROMA',
     'key.modeLuma': 'LUMA',
@@ -3328,7 +3609,7 @@ const I18N = {
     'key.feather': 'Edge Feather (px)',
     'key.cleanup': 'Alpha Cleanup',
 
-    'grid.group': '03 · Grid Layout',
+    'grid.group': '04 · Grid Layout',
     'grid.preset': 'Preset',
     'grid.custom': 'Custom Cols × Rows',
     'grid.cols': 'cols',
@@ -3339,7 +3620,7 @@ const I18N = {
     'grid.cellSize': 'Cell size',
     'grid.totalSize': 'Atlas size',
 
-    'out.group': '04 · Output Spec',
+    'out.group': '05 · Output Spec',
     'out.sizeMode': 'Size mode',
     'out.fixed': 'FIXED CELL',
     'out.native': 'NATIVE PER-CELL',
@@ -3349,7 +3630,7 @@ const I18N = {
     'out.total': 'Total',
     'out.trimAlpha': 'Auto-fit content (trim alpha)',
 
-    'exp.group': '05 · Export',
+    'exp.group': '06 · Export',
     'exp.spriteSheet': 'Sprite Sheet (single PNG)',
     'exp.frameSeq': 'Frame Sequence (ZIP)',
     'exp.prefix': 'Filename Prefix',
@@ -3371,7 +3652,7 @@ const I18N = {
     'aspect.bg': 'BG',
     'aspect.custom': 'Custom',
     'aspect.bgDisabled': 'Load a background image first',
-    'aspect.fit': '⊡ FIT',
+    'aspect.fit': 'FIT',
     'aspect.fitTip': 'Fit to viewport (or double-click)',
     'aspect.fs': 'Fullscreen (F11)',
     'aspect.presetHint': 'Pick a preset',
@@ -3398,6 +3679,17 @@ const I18N = {
     'edit.hint': 'Filters apply to the full pipeline — Keying, Slicing, and the final atlas all reflect them.',
     'edit.noFilter': 'No filter',
     'edit.active': '✓ Active · ',
+
+    'crop.group': '02 · Crop',
+    'crop.label': 'Crop',
+    'crop.full': 'Full source',
+    'crop.active': 'Cropped',
+    'crop.handles': 'Show Crop',
+    'crop.handlesTip': 'Show / hide drag handles & guide lines · crop result is unaffected',
+    'crop.reset': 'RESET',
+    'crop.resetTip': 'Reset to full source',
+
+    'bg.dragTip': 'Drag to reposition this panel',
 
     'keying.time': 'Source Time',
     'keying.pickColor': '◉ Pick color',
@@ -3563,6 +3855,27 @@ const state = {
   inTime: 0,
   outTime: 0,
   playheadTime: 0,     // current scrub position (timeline playhead)
+
+  // Proposal B — Crop is an OUTPUT operation, not a pipeline stage.
+  // Processing/Keying/Filters run on full source; crop is applied only
+  // when writing into LP cache frames or atlas cells. The crop frame is
+  // ALWAYS visible (no enable toggle); when cropX/Y/W/H equals the full
+  // source, there's no actual crop. RESET returns the rect to full source.
+  cropX: 0,
+  cropY: 0,
+  cropW: 0,           // 0 = full width; populated to source W on first load
+  cropH: 0,
+  cropShowHandles: true,  // toggles visibility of drag handles + guide lines
+                          // (crop itself is always active; this is purely UI)
+
+  // ============ SOURCE-FRAME CACHE ============
+  // Avoid re-seeking video for every keying/filter parameter change.
+  // Holds [{ canvas, time }] of decoded source frames sized to current
+  // sample-range plan. Invalidated only when in/out/cols/rows/crop change,
+  // OR when source is reloaded. For GIFs this stays null (gifFrames already
+  // serves as the pre-decoded cache).
+  srcFrameCache: null,
+  srcFrameCacheDirty: true,
   // gif data
   gifFrames: null,     // [{canvas, time, delay}, ...]
   // keying
@@ -3589,7 +3902,7 @@ const state = {
   pickMode: false,
   generated: null,
   // backdrop
-  bdMode: 'solid',     // 'solid' | 'checker'
+  bdMode: 'checker',     // 'solid' | 'checker' | 'image' — checker default
   bdColor: '#00ff00',
   // player
   playing: false,
@@ -4274,6 +4587,7 @@ function finalizeSourceLoad(file, frameCount, isGif) {
   $('emptyState').style.display = 'none';
   $('lpArea').style.display = 'flex';
   $('canvasWrap').style.display = 'block';
+  $('cropGroup').style.display = 'block';
   $('keyGroup').style.display = 'block';
   $('globalTimeline').style.display = 'flex';
   $('playbackBar').style.display = 'flex';
@@ -4289,6 +4603,9 @@ function finalizeSourceLoad(file, frameCount, isGif) {
   // First-time: show Processing sub-tab
   if (typeof showSubTab === 'function') showSubTab('processing');
   state.playheadTime = 0;
+  // Reset crop to full source + invalidate any cached source frames
+  if (typeof initCropForSource === 'function') initCropForSource();
+  if (typeof invalidateSrcCache === 'function') invalidateSrcCache();
   updateRangeInfo();
   seekAndRender(0);
   if (typeof applyCanvasAspect === 'function') {
@@ -4362,11 +4679,17 @@ function finalizeSourceLoad(file, frameCount, isGif) {
 
   function endDrag() {
     if (!dragging) return;
+    const wasRangeChange = (dragging === 'in' || dragging === 'out');
     dragging = null;
     track.classList.remove('dragging');
     hIn.classList.remove('active');
     hOut.classList.remove('active');
     playhead.classList.remove('active');
+    // Range change invalidates source frame cache + lp cache
+    if (wasRangeChange && typeof invalidateSrcCache === 'function') {
+      invalidateSrcCache();
+      if (typeof invalidateLpCache === 'function') invalidateLpCache();
+    }
   }
 
   // Drag start on handles
@@ -4562,15 +4885,14 @@ previewCanvas.addEventListener('click', e => {
    FRAME PROCESSING (KEYING + FEATHER)
    ============================================================ */
 function processFrame() {
-  // 1. raw frame already in extractCanvas. Read pixels.
+  // Pipeline: raw → keying → cleanup → feather → filters → output
+  // Crop is NOT part of this pipeline; it's applied only when writing
+  // into the LP cache or the atlas (see buildLpCache, generateAtlas).
+  // This keeps Processing-tab interactions at full source speed regardless
+  // of whether crop is enabled.
   const W = state.width, H = state.height;
   const src = ectx.getImageData(0, 0, W, H);
   const data = src.data;
-
-  // Pipeline order matters:
-  //   raw → keying (color-aware, uses pristine colors) → filters → output
-  // Doing filters BEFORE keying would shift the key color too and break
-  // chroma-key behavior. So filters apply after the keying step.
 
   if (state.mode === 'chroma') {
     chromaKey(data, W, H);
@@ -4578,7 +4900,6 @@ function processFrame() {
     lumaKey(data, W, H);
   }
 
-  // alpha cleanup (binarize low alpha)
   if (state.cleanup > 0) {
     const thr = state.cleanup * 255;
     for (let i = 3; i < data.length; i += 4) {
@@ -4586,19 +4907,19 @@ function processFrame() {
     }
   }
 
-  // feather (box blur on alpha only, separable)
   if (state.feather > 0) {
     boxBlurAlpha(data, W, H, Math.round(state.feather));
   }
 
-  // Edit filters (Hue shift + Grayscale) — applied AFTER keying so the
-  // user's keying parameters operate on pristine source colors.
   applyEditFilters(data);
 
-  // draw to preview
+  // prev/proc canvases stay at source size — restore if a previous build
+  // shrunk them (defensive: shouldn't happen with proposal B but cheap).
+  if (previewCanvas.width !== W || previewCanvas.height !== H) {
+    previewCanvas.width = W; previewCanvas.height = H;
+    procCanvas.width = W; procCanvas.height = H;
+  }
   prevCtx.putImageData(src, 0, 0);
-
-  // also keep proc canvas for atlas building
   pctx.putImageData(src, 0, 0);
 }
 
@@ -4772,6 +5093,7 @@ $('gridChips').addEventListener('click', e => {
   state.rows = parseInt(b.dataset.r);
   $('customCols').value = '';
   $('customRows').value = '';
+  if (typeof invalidateSrcCache === 'function') invalidateSrcCache();
   recomputeFrameInfo();
 });
 function applyCustomGrid() {
@@ -4781,9 +5103,9 @@ function applyCustomGrid() {
     state.cols = c;
     state.rows = r;
     $('gridChips').querySelectorAll('button').forEach(x => x.classList.remove('on'));
-    // highlight matching preset if exact
     const match = $('gridChips').querySelector(`button[data-c="${c}"][data-r="${r}"]`);
     if (match) match.classList.add('on');
+    if (typeof invalidateSrcCache === 'function') invalidateSrcCache();
   }
   recomputeFrameInfo();
 }
@@ -4818,12 +5140,14 @@ function recomputeFrameInfo() {
   } else {
     $('strideInfo').textContent = 'auto';
   }
+  // Effective source dims (after crop)
+  const effDims = (typeof getEffectiveDims === 'function') ? getEffectiveDims() : { w: state.width, h: state.height };
   let cellW, cellH;
   if (state.sizeMode === 'fixed') {
     cellW = cellH = state.cellPx;
   } else {
-    cellW = state.width || 0;
-    cellH = state.height || 0;
+    cellW = effDims.w || 0;
+    cellH = effDims.h || 0;
   }
   $('cellSize').textContent = cellW && cellH ? `${cellW}×${cellH}` : '—';
   $('totalSize').textContent = cellW && cellH ? `${cellW*state.cols}×${cellH*state.rows}` : '—';
@@ -5266,37 +5590,36 @@ function applyCanvasAspect() {
   frame.style.height = h + 'px';
 
   // Compute how the source image should be displayed within the canvas-frame.
-  // Source resolution is state.width × state.height (e.g. 1920×1080), but
-  // the canvas-frame is the Aspect-defined box (e.g. 512×512). We letterbox
-  // the source inside the frame so transparent areas of the canvas reveal
-  // the canvas-frame's background (checker / image / solid).
-  //
-  // The trick: <canvas> doesn't honour object-fit reliably, so we compute the
-  // display size in JS and set canvas.style.width/height explicitly. The
-  // canvas's intrinsic pixel size stays = source W/H so drawing code is
-  // unchanged. CSS centers it within canvas-wrap.
+  // Source resolution is state.width × state.height. Crop affects only the
+  // output sample/atlas — not the Processing preview — so we letterbox by
+  // SOURCE aspect always. The crop overlay positions itself against this
+  // same display rect.
   if (state.videoLoaded && state.width && state.height) {
     const srcAspect = state.width / state.height;
     const frameAspect = w / h;
     let dispW, dispH;
     if (srcAspect > frameAspect) {
-      // source is wider — fit by width, letterbox top/bottom
       dispW = w;
       dispH = w / srcAspect;
     } else {
-      // source is taller — fit by height, letterbox left/right
       dispH = h;
       dispW = h * srcAspect;
     }
+    const dispLeft = (w - dispW) / 2;
+    const dispTop = (h - dispH) / 2;
     canvas.style.width  = dispW + 'px';
     canvas.style.height = dispH + 'px';
     canvas.style.position = 'absolute';
-    canvas.style.left = ((w - dispW) / 2) + 'px';
-    canvas.style.top = ((h - dispH) / 2) + 'px';
+    canvas.style.left = dispLeft + 'px';
+    canvas.style.top = dispTop + 'px';
+    state.canvasDisplayRect = { left: dispLeft, top: dispTop, width: dispW, height: dispH };
   } else {
     canvas.style.width  = '100%';
     canvas.style.height = '100%';
+    state.canvasDisplayRect = null;
   }
+  // Re-sync crop overlay if it's currently visible
+  if (typeof updateCropOverlay === 'function') updateCropOverlay();
 
   // Sync UI
   updateCompStatline();
@@ -5659,6 +5982,277 @@ function refreshFilterPipeline() {
   }
 }
 
+/* ============================================================
+   CROP MODULE (Proposal B — always-on, output-time crop)
+   ============================================================
+   Stored in source pixel coords (top-left origin):
+     state.cropX, cropY, cropW, cropH  (numbers, source pixels)
+   Crop is ALWAYS active. By default cropX=0,Y=0,W=srcW,H=srcH which means
+   "crop = full source" = visually no crop. User drags handles inward to
+   shrink; RESET returns to full source. There's no enable/disable toggle.
+   Processing pipeline never sees crop. Applied at output write time:
+     - buildLpCache extracts the crop region per frame
+     - generateAtlas extracts the crop region per cell
+   ============================================================ */
+
+/* Returns true when the crop rect is strictly smaller than the full source.
+   Used by output writers to skip pointless sub-rect copies when there's
+   no actual crop in effect. */
+function hasCropEffect() {
+  return state.width > 0 && state.height > 0 &&
+         (state.cropX > 0 || state.cropY > 0 ||
+          state.cropW < state.width || state.cropH < state.height);
+}
+
+/* Convenience getter: returns crop region or full source. Only used by
+   output-writing code paths. Processing does NOT call this. */
+function getEffectiveDims() {
+  if (hasCropEffect() && state.cropW > 0 && state.cropH > 0) {
+    return { w: state.cropW, h: state.cropH, x: state.cropX, y: state.cropY };
+  }
+  return { w: state.width, h: state.height, x: 0, y: 0 };
+}
+
+/* Initialize crop to full-frame the first time a source loads */
+function initCropForSource() {
+  state.cropX = 0;
+  state.cropY = 0;
+  state.cropW = state.width;
+  state.cropH = state.height;
+  updateCropInfo();
+  updateCropOverlay();
+}
+
+/* Visual sync — overlay the crop rect on top of the rendered source. ALWAYS
+   visible when a source is loaded. Maps source-pixel crop coords through
+   state.canvasDisplayRect (set by applyCanvasAspect).
+   ALSO applies the mask visual: a CSS clip-path on the canvas hides pixels
+   outside the crop rect, letting the canvas-frame backdrop show through.
+   Pipeline is unaffected — this is pure visual masking. */
+function updateCropOverlay() {
+  const overlay = $('cropOverlay');
+  if (!overlay || !overlay.style) return;
+  // Overlay is always visible when a source is loaded
+  overlay.style.display = state.videoLoaded ? 'block' : 'none';
+  // Toggle visibility of drag handles + guide lines (purely UI; crop active either way)
+  if (overlay.classList) {
+    overlay.classList.toggle('show-handles', !!state.cropShowHandles);
+  }
+
+  const canvas = $('previewCanvas');
+  if (!state.videoLoaded || !state.width) {
+    if (canvas && canvas.style) canvas.style.clipPath = '';
+    return;
+  }
+
+  // ---- Mask via clip-path on the canvas element ----
+  // clip-path inset values are relative to the CANVAS element itself, so we
+  // use the crop's percentages within the source. Pixels outside the crop
+  // get clipped → the canvas-frame backdrop (checker/solid/image) shows.
+  if (canvas && canvas.style) {
+    const topPct = (state.cropY / state.height) * 100;
+    const leftPct = (state.cropX / state.width) * 100;
+    const rightPct = 100 - ((state.cropX + state.cropW) / state.width) * 100;
+    const bottomPct = 100 - ((state.cropY + state.cropH) / state.height) * 100;
+    if (hasCropEffect()) {
+      canvas.style.clipPath = `inset(${topPct}% ${rightPct}% ${bottomPct}% ${leftPct}%)`;
+    } else {
+      canvas.style.clipPath = '';   // no crop → no clip
+    }
+  }
+
+  const rect = state.canvasDisplayRect;
+  if (!rect) return;
+
+  // ---- Crop rect (drag handles + guide lines) in canvas-wrap coords ----
+  const cropPxX = rect.left + (state.cropX / state.width) * rect.width;
+  const cropPxY = rect.top + (state.cropY / state.height) * rect.height;
+  const cropPxW = (state.cropW / state.width) * rect.width;
+  const cropPxH = (state.cropH / state.height) * rect.height;
+
+  const cropRect = $('cropRect');
+  if (cropRect && cropRect.style) {
+    cropRect.style.left = cropPxX + 'px';
+    cropRect.style.top = cropPxY + 'px';
+    cropRect.style.width = cropPxW + 'px';
+    cropRect.style.height = cropPxH + 'px';
+  }
+
+  // Dim bands are no longer needed — the clip-path on canvas does the
+  // real masking. We set them to zero size so they don't render.
+  $('cropDimTop').style.cssText = 'display:none;';
+  $('cropDimBottom').style.cssText = 'display:none;';
+  $('cropDimLeft').style.cssText = 'display:none;';
+  $('cropDimRight').style.cssText = 'display:none;';
+
+  $('cropSizeReadout').textContent = `${Math.round(state.cropW)} × ${Math.round(state.cropH)}`;
+}
+
+function updateCropInfo() {
+  const info = $('cropInfo');
+  if (!info) return;
+  info.classList.toggle('active', hasCropEffect());
+  if (!hasCropEffect()) {
+    info.innerHTML = `<span data-i18n="crop.full">${typeof t === 'function' ? t('crop.full', '完整來源') : '完整來源'}</span>`;
+  } else {
+    const tag = typeof t === 'function' ? t('crop.active', '裁剪中') : '裁剪中';
+    // Two-line layout: status + size on row 1, origin on row 2.
+    info.innerHTML =
+      `<div><span style="color:var(--accent)">●</span> ${tag} · ${Math.round(state.cropW)}×${Math.round(state.cropH)}</div>` +
+      `<div style="color:var(--ink-low); font-size:10px; margin-top:2px">(${Math.round(state.cropX)}, ${Math.round(state.cropY)})</div>`;
+  }
+}
+
+/* Toggle handles + guide visibility (purely a UI aid — crop still applies) */
+$('cropHandlesBtn').onclick = () => {
+  state.cropShowHandles = !state.cropShowHandles;
+  $('cropHandlesBtn').classList.toggle('on', state.cropShowHandles);
+  updateCropOverlay();
+};
+
+/* Reset crop rect to the full source */
+$('cropResetBtn').onclick = () => {
+  state.cropX = 0;
+  state.cropY = 0;
+  state.cropW = state.width;
+  state.cropH = state.height;
+  invalidateLpCache();
+  updateCropOverlay();
+  updateCropInfo();
+  recomputeFrameInfo();
+};
+
+/* ============ CROP DRAG INTERACTION ============
+   Handles + center-region drag. Coordinates are converted between screen px
+   (pointer events) and source px (state) via the canvas-wrap's bounding rect. */
+(function initCropDragging() {
+  const overlay = $('cropOverlay');
+  const rect = $('cropRect');
+  if (!overlay || !overlay.addEventListener) return;
+
+  let drag = null;  // { edge, startX, startY, startCropX, ..., bounds }
+
+  function startDrag(edge, e) {
+    if (!state.videoLoaded) return;
+    if (!state.cropShowHandles) return;  // handles hidden → drag disabled
+    e.preventDefault();
+    e.stopPropagation();
+    // Capture the canvas-wrap's on-screen rect AND the canvas display rect
+    // (in CSS px). The ratio of the two gives the effective viewport zoom.
+    const wrap = $('canvasWrap').getBoundingClientRect();
+    drag = {
+      edge,
+      bounds: wrap,
+      startX: e.clientX,
+      startY: e.clientY,
+      cropX: state.cropX,
+      cropY: state.cropY,
+      cropW: state.cropW,
+      cropH: state.cropH,
+    };
+  }
+
+  function updateDrag(e) {
+    if (!drag) return;
+    const wrap = drag.bounds;
+    const dispRect = state.canvasDisplayRect;
+    if (!dispRect) return;
+    // wrap.width is the SCREEN width (after viewport zoom + any CSS).
+    // dispRect is in CSS px (pre-zoom). So:
+    //   screen-px → css-px:    deltaPx / (wrap.width / cssWrapWidth)
+    //   css-px    → source-px: deltaPx * (state.width / dispRect.width)
+    // The first factor is the effective viewport zoom. We can collapse both:
+    //   source-px = screenDelta * (state.width / wrap.width) * (cssWrapWidth / dispRect.width)
+    // But cssWrapWidth equals the canvas-frame width in CSS px — and wrap
+    // covers the same CSS area. Since the ratio wrap.width/cssWrapWidth IS
+    // the zoom, and dispRect.width is in CSS px:
+    //   effective scale = (state.width / dispRect.width) / (wrap.width / cssWrapWidth)
+    // Simpler: source-px per screen-px = state.width / (dispRect.width × zoom)
+    //                                  = state.width × (canvasFrameWidth / dispRect.width) / wrap.width
+    // The cleanest form: dispRect.width is letterboxed inside canvas-frame,
+    // and canvas-frame's on-screen width is wrap.width (canvas-wrap fills frame).
+    // So dispRect on-screen width = wrap.width × (dispRect.width / canvasFrameCssWidth)
+    // But canvas-frame's CSS width was set to canvasFrameCssWidth. We don't
+    // need this in a separate var — wrap is canvas-wrap which has the same
+    // CSS size as canvas-frame's inner area (inset:0).
+    // FINAL: source-px-per-screen-px = state.width / (dispRect.width × zoom)
+    //                                where zoom = wrap.width / canvasFrameCssWidth
+    // Since canvas-wrap inset:0 inside canvas-frame, wrap is exactly the
+    // CSS size of the inner content area × zoom. We approximate canvasFrameCss
+    // size as: dispRect comes from canvas-frame internal layout — so it's
+    // already in the same coordinate space as canvas-frame.
+    //
+    // Practical shortcut: we know wrap.width corresponds to a CSS area that
+    // *contains* dispRect (with letterbox). The ratio of source pixels to
+    // screen pixels along the source axis is:
+    //   sx = state.width / (dispRect.width × (wrap.width / cssTotalCanvasWidth))
+    // where cssTotalCanvasWidth ≈ canvas-frame CSS width. But we don't have
+    // direct access. Easier: query the on-screen position of the actual
+    // <canvas> element, which IS the displayed source rect, post-zoom.
+    const canvasEl = $('previewCanvas');
+    const canvasRect = canvasEl.getBoundingClientRect();
+    const sx = state.width / canvasRect.width;
+    const sy = state.height / canvasRect.height;
+    const dxSrc = (e.clientX - drag.startX) * sx;
+    const dySrc = (e.clientY - drag.startY) * sy;
+
+    let x = drag.cropX, y = drag.cropY, w = drag.cropW, h = drag.cropH;
+    const e_ = drag.edge;
+    const MIN = 16;  // minimum crop size in source px
+
+    if (e_ === 'move') {
+      x = drag.cropX + dxSrc;
+      y = drag.cropY + dySrc;
+    } else {
+      // Resize logic per handle
+      if (e_.includes('w')) { const nx = drag.cropX + dxSrc; const nw = drag.cropW - dxSrc; if (nw >= MIN) { x = nx; w = nw; } }
+      if (e_.includes('e')) { const nw = drag.cropW + dxSrc; if (nw >= MIN) w = nw; }
+      if (e_.includes('n')) { const ny = drag.cropY + dySrc; const nh = drag.cropH - dySrc; if (nh >= MIN) { y = ny; h = nh; } }
+      if (e_.includes('s')) { const nh = drag.cropH + dySrc; if (nh >= MIN) h = nh; }
+    }
+
+    // Clamp to source bounds
+    x = Math.max(0, Math.min(state.width - MIN, x));
+    y = Math.max(0, Math.min(state.height - MIN, y));
+    w = Math.max(MIN, Math.min(state.width - x, w));
+    h = Math.max(MIN, Math.min(state.height - y, h));
+
+    state.cropX = x; state.cropY = y;
+    state.cropW = w; state.cropH = h;
+    updateCropOverlay();
+    updateCropInfo();
+  }
+
+  function endDrag() {
+    if (!drag) return;
+    drag = null;
+    // Crop region committed → invalidate LP cache (atlas / loop frames need
+    // re-extraction with the new crop region). Processing preview is NOT
+    // affected by crop, so we don't re-render it.
+    invalidateLpCache();
+    recomputeFrameInfo();
+  }
+
+  // Handles
+  document.querySelectorAll('.crop-handle').forEach(h => {
+    h.addEventListener('mousedown', e => startDrag(h.dataset.edge, e));
+  });
+  // Drag inside the rect (not on a handle) = move
+  rect.addEventListener('mousedown', e => {
+    if (e.target.classList && e.target.classList.contains('crop-handle')) return;
+    startDrag('move', e);
+  });
+  window.addEventListener('mousemove', updateDrag);
+  window.addEventListener('mouseup', endDrag);
+})();
+
+/* No-op stub kept for callers that still invoke it. Source-frame cache
+   was removed because the extra canvas allocation slowed common cases. */
+function invalidateSrcCache() {
+  state.srcFrameCache = null;
+  state.srcFrameCacheDirty = true;
+}
+
 $('editGrayscale').oninput = e => {
   state.editGrayscale = parseInt(e.target.value) / 100;
   $('editGrayscaleVal').textContent = e.target.value + '%';
@@ -5794,14 +6388,30 @@ async function buildLpCache(force = false) {
     else outputTimes.push(plan[i].time);
   }
 
+  // Note: an earlier version pre-decoded source frames into srcFrameCache
+  // to skip video seeks on parameter changes. In practice the extra canvas
+  // allocation + drawImage round-trip slowed things down for typical 4×4
+  // grids, so this optimization was removed. seekAndRender's built-in path
+  // is fast enough for the common case (16-64 frames).
+
   const frames = [];
+  // Crop is applied here, at output time — proc canvas is at source size,
+  // we copy only the crop region into the cell-sized cache canvas.
+  const crop = hasCropEffect()
+    ? { x: state.cropX, y: state.cropY, w: state.cropW, h: state.cropH }
+    : { x: 0, y: 0, w: state.width, h: state.height };
   for (let i = 0; i < total; i++) {
     if (state.lpCacheBuilding !== true) break;  // canceled
     await seekAndRender(outputTimes[i]);
     const fc = document.createElement('canvas');
-    fc.width = state.width;
-    fc.height = state.height;
-    fc.getContext('2d').drawImage(procCanvas, 0, 0);
+    fc.width = crop.w;
+    fc.height = crop.h;
+    // drawImage with source rect = crop region of procCanvas
+    fc.getContext('2d').drawImage(
+      procCanvas,
+      crop.x, crop.y, crop.w, crop.h,   // source rect (crop region)
+      0, 0, crop.w, crop.h               // destination (full cache canvas)
+    );
     frames.push(fc);
     setLpCacheStatus(`building ${i+1}/${total}`);
   }
@@ -5857,8 +6467,14 @@ function drawLpFrame() {
   if (!state.lpCache || !state.lpCache.frames.length) return;
   const idx = Math.max(0, Math.min(state.lpFrame, state.lpCache.frames.length - 1));
   const frame = state.lpCache.frames[idx];
+  // previewCanvas is at source dimensions (state.width × state.height); the
+  // cached frame is at crop dimensions (frame.width × frame.height). Draw the
+  // frame at the crop's source-pixel origin so that the canvas's clip-path
+  // (which masks anything outside the crop rect) aligns perfectly.
   prevCtx.clearRect(0, 0, state.width, state.height);
-  prevCtx.drawImage(frame, 0, 0);
+  const offsetX = hasCropEffect() ? state.cropX : 0;
+  const offsetY = hasCropEffect() ? state.cropY : 0;
+  prevCtx.drawImage(frame, offsetX, offsetY);
   const total = state.lpCache.frames.length;
   $('lpFrameLabel').textContent = `${idx} / ${total}`;
   // Legacy scrub (dummy in new layout but kept for compat)
@@ -6303,12 +6919,17 @@ $('genBtn').onclick = async () => {
 
   // ---- 2. Sample frames ----
   const frames = [];
+  // Crop is applied at sample time. procCanvas always contains the full
+  // source (post-keying/filter). cellW/cellH determine the output cell size.
+  const crop = hasCropEffect()
+    ? { x: state.cropX, y: state.cropY, w: state.cropW, h: state.cropH }
+    : { x: 0, y: 0, w: state.width, h: state.height };
   let cellW, cellH;
   if (state.sizeMode === 'fixed') {
     cellW = cellH = state.cellPx;
   } else {
-    cellW = state.width;
-    cellH = state.height;
+    cellW = crop.w;
+    cellH = crop.h;
   }
 
   for (let i = 0; i < total; i++) {
@@ -6322,16 +6943,23 @@ $('genBtn').onclick = async () => {
     fc.width = cellW; fc.height = cellH;
     const fctx = fc.getContext('2d');
     if (state.trimAlpha) {
-      const bbox = computeAlphaBBox(pctx, state.width, state.height);
+      // Trim alpha within the crop region. Use a per-frame canvas to hold
+      // just the cropped pixels, then bbox that.
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = crop.w; cropCanvas.height = crop.h;
+      const cropCtx = cropCanvas.getContext('2d');
+      cropCtx.drawImage(procCanvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+      const bbox = computeAlphaBBox(cropCtx, crop.w, crop.h);
       if (bbox) {
         const fit = fitInto(bbox.w, bbox.h, cellW, cellH);
-        fctx.drawImage(procCanvas,
+        fctx.drawImage(cropCanvas,
           bbox.x, bbox.y, bbox.w, bbox.h,
           (cellW - fit.w)/2, (cellH - fit.h)/2, fit.w, fit.h);
       }
     } else {
-      const fit = fitInto(state.width, state.height, cellW, cellH);
-      fctx.drawImage(procCanvas, 0, 0, state.width, state.height,
+      const fit = fitInto(crop.w, crop.h, cellW, cellH);
+      fctx.drawImage(procCanvas,
+        crop.x, crop.y, crop.w, crop.h,    // source rect (crop region)
         (cellW - fit.w)/2, (cellH - fit.h)/2, fit.w, fit.h);
     }
     frames.push(fc);
@@ -7121,6 +7749,101 @@ document.querySelectorAll('.preset-dots button[data-color]').forEach(btn => {
 
 // initial application
 applyBackdrop();
+
+/* ============================================================
+   FLOATING BACKDROP BAR DRAG
+   ============================================================
+   The BG control bar in the Live Preview area can be dragged to any
+   position within the viewport. The drag handle on its left edge captures
+   mousedown; the rest of the bar (buttons, swatches, colorpicker) remains
+   clickable as normal. Position is clamped to the viewport's bounding box
+   and is NOT persisted across reloads (resets to bottom-right on load).
+   ============================================================ */
+(function initBackdropBarDrag() {
+  const bar = $('backdropBarPrev');
+  const handle = $('bdDragHandle');
+  const vp = $('viewport');
+  if (!bar || !handle || !vp || !handle.addEventListener) return;
+
+  let drag = null;  // { startX, startY, startLeft, startTop, vpRect, barW, barH }
+
+  function startDrag(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const vpRect = vp.getBoundingClientRect();
+    const barRect = bar.getBoundingClientRect();
+    // First drag: convert anchor from bottom/right to left/top by reading
+    // the current rendered position relative to the viewport.
+    if (!bar.classList.contains('dragged')) {
+      bar.style.left = (barRect.left - vpRect.left) + 'px';
+      bar.style.top  = (barRect.top  - vpRect.top)  + 'px';
+      bar.classList.add('dragged');
+    }
+    drag = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startLeft: parseFloat(bar.style.left) || 0,
+      startTop:  parseFloat(bar.style.top)  || 0,
+      vpW: vpRect.width,
+      vpH: vpRect.height,
+      barW: barRect.width,
+      barH: barRect.height,
+    };
+    bar.classList.add('dragging');
+  }
+
+  function updateDrag(e) {
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    let newLeft = drag.startLeft + dx;
+    let newTop  = drag.startTop  + dy;
+    // Clamp within viewport
+    const maxLeft = Math.max(0, drag.vpW - drag.barW);
+    const maxTop  = Math.max(0, drag.vpH - drag.barH);
+    newLeft = Math.max(0, Math.min(maxLeft, newLeft));
+    newTop  = Math.max(0, Math.min(maxTop,  newTop));
+    bar.style.left = newLeft + 'px';
+    bar.style.top  = newTop  + 'px';
+  }
+
+  function endDrag() {
+    if (!drag) return;
+    drag = null;
+    bar.classList.remove('dragging');
+  }
+
+  handle.addEventListener('mousedown', startDrag);
+  window.addEventListener('mousemove', updateDrag);
+  window.addEventListener('mouseup', endDrag);
+
+  // Touch support (mobile/tablet)
+  handle.addEventListener('touchstart', e => {
+    if (e.touches[0]) startDrag(e.touches[0]);
+  }, { passive: false });
+  window.addEventListener('touchmove', e => {
+    if (drag && e.touches[0]) { e.preventDefault(); updateDrag(e.touches[0]); }
+  }, { passive: false });
+  window.addEventListener('touchend', endDrag);
+  window.addEventListener('touchcancel', endDrag);
+
+  // If the viewport is resized (window resize / fullscreen toggle),
+  // ensure the bar stays inside. Use ResizeObserver where available.
+  if (typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(() => {
+      if (!bar.classList.contains('dragged')) return;
+      const vpRect = vp.getBoundingClientRect();
+      const barRect = bar.getBoundingClientRect();
+      const currentLeft = parseFloat(bar.style.left) || 0;
+      const currentTop  = parseFloat(bar.style.top)  || 0;
+      const maxLeft = Math.max(0, vpRect.width  - barRect.width);
+      const maxTop  = Math.max(0, vpRect.height - barRect.height);
+      bar.style.left = Math.max(0, Math.min(maxLeft, currentLeft)) + 'px';
+      bar.style.top  = Math.max(0, Math.min(maxTop,  currentTop))  + 'px';
+    });
+    ro.observe(vp);
+  }
+})();
 
 // init
 recomputeFrameInfo();
