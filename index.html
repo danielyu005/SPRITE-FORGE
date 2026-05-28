@@ -3865,8 +3865,9 @@ const state = {
   cropY: 0,
   cropW: 0,           // 0 = full width; populated to source W on first load
   cropH: 0,
-  cropShowHandles: true,  // toggles visibility of drag handles + guide lines
-                          // (crop itself is always active; this is purely UI)
+  cropShowHandles: false, // toggles visibility of drag handles + guide lines
+                          // (crop itself is always active; this is purely UI).
+                          // Default off — user must press "Show Crop" to reveal.
 
   // ============ SOURCE-FRAME CACHE ============
   // Avoid re-seeking video for every keying/filter parameter change.
@@ -6019,6 +6020,9 @@ function initCropForSource() {
   state.cropY = 0;
   state.cropW = state.width;
   state.cropH = state.height;
+  // Handles default OFF on every load — user reveals them via "Show Crop".
+  state.cropShowHandles = false;
+  $('cropHandlesBtn').classList.remove('on');
   updateCropInfo();
   updateCropOverlay();
 }
